@@ -1,0 +1,161 @@
+---
+title: "PEC 1 - Mireia Aguilà"
+author: "Mireia Aguilà"
+date: "2024-11-01"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Abstract ##
+
+La caquèxia és una síndrome caracteritzat per una pèrdua significativa de pes, i conseqüentment una pèrdua de massa muscular, que sol trobar-se relacionada amb certes malalties cròniques greus com poden ser insuficiències renals, cardíaques i hepàtiques i, amb el càncer, entre d'altres. És un síndrome causat per canvis metabòlics complexes en l'organisme que acaben comportant una inflamació continuada en el temps el que contribueix a una degradació de proteïnes musculars importants.
+
+Mitjançant l'anàlisis de 77 mostres d'orina provinents de pacients amb caquèxia i pacients control, s'ha pogut establir una expressió diferencial de diversos metabolits que estan relacionats amb la degradació muscular que pateixen aquests pacients i, que comporten una possible diana terapèutica a investigar per tal de millorar el nivell de vida de la gent que pateix aquest síndrome derivat de malalties cròniques greus.
+
+## Objectiu de l'estudi ##
+
+L'objectiu d'aquest estudi és el d'analitzar unes dades provenents de 77 mostres d'orina, 47 d'aquestes mostres provinents de pacients amb caquèxia i 30 mostres de pacients control, per tal d'observar si hi ha diferències notables en alguns dels 63 metabolits estudiats entre els dos grups.
+
+## Materials i mètodes ##
+
+Les dades utilitzades en aquest estudi provenen de 77 mostres d'orina en les quals s'analitza l'expressió de 63 metabolits diferents. De les 77 mostres, n'hi ha 47 que provenen de pacients amb caquèxia (un síndrome caracteritzada per la pèrdua de massa muscular) i, n'hi ha 30 que provenen de controls sans.
+
+Una vegada aquestes dades provinents de l'Universitat de Califòrnia es van pujar a la pàgina web de "metabolomics workbench", el 22 de febrer de 2023, van ser descarregades en format csv per tal de ser analitzades en R versió 4.4.1.
+
+Per tal de realitzar l'anàlisis es va utilitzar Bioconductor versió 3.19, concretament el paquet Summarized Experiment. Posteriorment també es va realitzar un anàlisis estadístic mitjançant R per tal d'observar si hi havia diferències estadístiques significatives en alguns dels metabolits entre pacients malalts i paciens sants.
+
+## Resultats ##
+
+Per tal de poder realitzar l'anàlisis de les dades, en primera instància necessitem instal·lar el paquet Summarized Experiment de Bioconductor i carregar les dades en format csv del nostre projecte d'interès.
+
+```{r}
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#   install.packages("BiocManager")
+# BiocManager::install("SummarizedExperiment")
+library(SummarizedExperiment) # Obrim el paquet necessari
+library(dplyr)
+dades <- read.csv("/Users/mireiaaguilabargues/Downloads/human_cachexia.csv") # Carreguem les dades
+```
+
+Una vegada tenim les nostres dades necessitem modificar-les per tal de que tinguin el format adequat per poder dur a terme l'anàlisis mitjançant Summarized Experiment. Analitzant el document inicial que tenim, hem pogut observar que la primera fila els diferents metabòlits estudiats, mentre que les primeres dues columnes contenen l'identificador de diversos pacients i indiquen si és un pacient amb la malaltia (caquèxia) o un control sa.
+
+```{r}
+# Modifiquem les dades del document csv per tal de poder analitzar-les amb el paquet SummarizedExperiment.
+
+noms_grups <- dades[, 1] # Obtenim el nom dels grups (identificadors dels pacients)
+assay_data <- as.matrix(dades[, -1]) # Matriu amb les nostres dades
+
+dades1 <- data.frame(Sample = colnames(assay_data)) # Obtenim les dades del nom dels diferents metabolits estudiats
+informacio_files <- data.frame(Feature = noms_grups) # Obtenim les dades dels diferents pacients estudiats
+
+# Creem el nostre objecte de summarized experiment
+se <- SummarizedExperiment(
+    assays = list(counts = assay_data),    
+    colData = DataFrame(dades1),       
+    rowData = DataFrame(informacio_files)        
+)
+
+# Analitzem el nostre objecte de Summarized Experiment
+se
+```
+
+Per tal de veure les dades experimentals inicials podem utilitzar la funció assay(). Si l'utilitzem en aquestes dades podem veure el que ja havíem observat en el document csv, on en la primera fila tenim una sèrie de de metabolits dels quals s'ha estudiat la seva expressió, i en la primera columna tenim la classificació de si les mostres provenen de pacients caquèxics o de pacients control sans.
+
+```{r}
+ # assays(se)$counts # Per tal de no ocupar molt espai, no es reproduiran aquets resultats en el present informe.
+```
+
+Una vegada tenim les dades carregades podem fer una visualització per tal de veure quins són els identificadors dels diferents pacients que estan en l'estudi i, quins són els diferents metabolits que s'han estudiat.
+
+```{r}
+rowData(se)
+colData(se)
+```
+
+S'ha intentat utilitzar la funció metadata() per tal d'obtenir informació relacionada amb els mètodes experimentals i publicacions de referència de les dades utilitzades, però no s'ha trobat informació.
+
+```{r}
+metadata(se)
+```
+
+Seguirem l'anàlisis de les dades observant si hi ha diferències significatives (amb un p-valor < 0.05) entre els diferents metabolits estudiats depenent de si la mostra prové d'orina d'humans amb caquèxia o si prové d'orina d'humans sans.
+
+Primer mirarem la mitjana d'expressió d'algun dels metabolits per tal de veure si hi ha diferències aparents (sense necessitat de ser estadísticament significatives) entre els dos grups.
+
+```{r}
+# És important assegurar-nos que la variable Muscle.loss és un factor abans de comenár l'anàlisis
+dades$Muscle.loss <- as.factor(dades$Muscle.loss)
+
+# Calculate the la mitjana per cadascun dels metabolits depenent de si són "controls" o individis caquèxics 
+mitjana <- aggregate(. ~ Muscle.loss, data = dades[, -1], FUN = mean)  # Excluim la primera columna ja que és l'identificador del pacient i no ens interessa en aquest moment.
+
+# Degut a la gran quantitat de columnes que hi ha, i per tal de fer-ho reproduïble per a l'informe, mostrarem els resultats dels 5 primers metabòlits únicament
+mitjana_1_5 <- mitjana[, 1:6]
+mitjana_1_5
+```
+
+A primera vista i observant únicament l'expressió en cadascun dels grups dels 5 primers metabolits, ja es pot observar que és probable que hi hagi diferències en l'expressió entre els pacients sans i els pacients malalts. Això es pot veure, per exemple, en l'expressió de l'anhidro-beta-d-glucosa i de l'oxoglutarat, on els pacients caquèxics tenen, de mitjana, el doble d'expressió.
+
+Ara crearem una taula obtenint el p-valor de cadascund dels metabolits per tal de veure si aquestes diferències entre grups són, o no, significatives.
+
+```{r}
+# Crearem un data.frame per tal d'introduir els valors per cadascun dels metabolits
+resultats <- data.frame(
+  Metabolits = character(),
+  p_value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Creem un loop per cadascuna de les columnes que contenen dades d'expressió dels metabolits. És per aquest motiu que comencem a partir de la tercera columna, ja que les dues primeres contenen l'identificador del pacient i a quin grup pertanyen.
+
+for (metabolit in names(dades)[3:ncol(dades)]) {
+  test_resultat <- t.test(
+    dades[[metabolit]] ~ dades$Muscle.loss,
+    data = dades,
+    alternative = "two.sided"
+  )
+  
+  # Guardem els resultats
+  resultats <- rbind(resultats, data.frame(
+    Metabolits = metabolit,
+    p_value = test_resultat$p.value
+  ))
+}
+
+# Mirem els resultats inicials
+head(resultats)
+```
+
+L'important és veure quins són els metabolits que estan expressats de manera significativament diferents entre els dos grups
+
+```{r}
+resultats %>%
+  filter(p_value < 0.05)
+```
+
+I això ens mostra que, dels 63 metabolits estudiats, n'hi ha 46 d'ells en els quals s'observa una diferència d'expressió estadísticament significativa entre els dos grups, pel que amb l'estudi d'orina és possible diferencia pacients caquèxics de pacients sans.
+
+## Discussió, limitacions i conclusions de l'estudi ##
+
+#### Discussió ####
+
+La caquèxia és una síndrome caracteritzat per una pèrdua significativa de pes, i conseqüentment una pèrdua de massa muscular, que sol trobar-se relacionada amb certes malalties cròniques greus com poden ser insuficiències renals, cardíaques i hepàtiques i, amb el càncer, entre d'altres. És un síndrome causat per canvis metabòlics complexes en l'organisme que acaben comportant una inflamació continuada en el temps el que contribueix a una degradació de proteïnes musculars importants.
+
+Els resultats obtinguts en l'anàlisis de les dades proporcionades ha mostrat que hi ha diferències significatives en la presència de diversos metabolits entre pacients que pateixen caquèxia i controls sans, ja que de 63 metabolits estudiats hi ha diferències significatives en 46 d'ells.
+
+Els resultats mostren que hi ha diferències significatives en la presència d'aminoàcids, on es pot veure que els pacients amb caquèxia tenen una major presència d'aquests en orina, comparat amb els pacients sans. El desequilibri en la presència d'aminoàcids és un símptome que es pot utilitzar com a un marcador biològic de la caquèxia degut a que indica destrucció muscular i l'ús d'aquests aminoàcids alliberats de les proteïnes musculars com a font d'energia.
+
+La majoria d'altres elements que es troben alterats reforcen la idea de la continuada inflamació i degradació muscular a la que els pacients amb caquèxia estan sotmesos, el que duu a la necessitat d'estudiar i trobar teràpies que puguin intentar reduir el ritme de degradació muscular així com l'estat nutricional d'aquests pacients.
+
+#### Limitacions #### 
+
+Tot i que l'estudi mostra diferències significatives en diversos metabolits depenent de l'estat de salut dels pacients, conté diverses limitacions. La primera limitació és deguda a la poca informació dels pacients dels quals s'han obtingut les diverses mostres d'orina, així com  informació de l'hora de recollida d'aquesta orina. La coneixènça d'altres factors i característiques dels pacients que s'estan estudiant donaria més garanties de que l'estudi realitzat s'ha fet de manera correcte, ja que els pacients amb caquèxia i els pacients sans es podrien emparellar segons aquestes característiques, per tal d'obtenir una comparació més fiable. Ara mateix, no sabem cap altra característica dels pacients, el que implica que aquests poden tenir altres malalties presents en el moment de l'estudi, poden ser d'edats i sexes diferents i, tot això, pot haver acabat influenciant els resultats introduits inicialment en l'estudi i, per tant, un biaix.
+
+Una altra limitació és el limitat nombre de pacients que s'han tingut en compte a l'hora de fer l'estudi, ja que per tal d'obtenir uns resultats més robustos seria ideal tenir una major mostra per a l'estudi dels diferents metabolits.
+
+#### Conclusions ####
+
+La caquèxia és un síndrome greu que causa grans desregulacions metabòliques en la gent que la pateix, degut a una inflamació continuada en el temps que comporta una degradació important de proteïnes musculars.
+
+El coneixement de la presència diferencial de certs metabolits, com aminoàcids i 1,6-Anhidro-β-D-glucosa, entre d'altres, dóna la possibilitat de trobar dianes terapèutiques permetin el desenvolupament de teràpies que ajudin a reduir la inflamació i la subseqüent degradació muscular i desnutrició i, per tant, que ajudin a millorar el nivell de vida de la gent que pateix l'enfermetat.
